@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calorie &amp; Fit Pro v6.0</title>
+    <style>
+        :root { 
+            --primary: #007aff; --success: #34c759; --danger: #ff3b30; --orange: #ff9500; --purple: #5856d6;
+            --bg: #f2f2f7; --card: #ffffff; --text: #1c1c1e; --grid: #e5e5ea;
+        }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .card { background: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 450px; margin-bottom: 15px; box-sizing: border-box; }
+        
+        h2 { margin: 0 0 15px 0; font-size: 1.1rem; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        h3 { margin: 15px 0 10px 0; font-size: 0.95rem; color: #555; }
+        .flex-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        
+        input, select { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1rem; width: 100%; box-sizing: border-box; background: #fff; }
+        button { padding: 12px 18px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+        button:active { opacity: 0.6; }
+        
+        .btn-blue { background: var(--primary); color: white; }
+        .btn-gray { background: #e5e5ea; color: var(--text); }
+        .btn-red { background: var(--danger); color: white; }
+        .btn-success { background: var(--success); color: white; }
+
+        /* Calendar */
+        .grid-7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7rem; border-radius: 8px; border: 1px solid #eee; cursor: pointer; position: relative; }
+        .day.selected { border: 2px solid var(--primary); font-weight: bold; }
+        .day.green { background: var(--success); color: white; border: none; }
+        .day.red { background: var(--danger); color: white; border: none; }
+        .workout-dot { width: 6px; height: 6px; background: var(--orange); border-radius: 50%; position: absolute; bottom: 4px; }
+
+        /* Summary Box */
+        .summary-container { max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; padding: 5px 10px; }
+        .summary-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f2f2f7; font-size: 0.85rem; }
+        .summary-item:last-child { border-bottom: none; }
+        .summary-item.active-day { background: #f0f7ff; margin: 0 -10px; padding: 12px 10px; border-left: 4px solid var(--primary); }
+        .deviation { font-weight: bold; min-width: 65px; text-align: right; }
+        .text-green { color: var(--success); }
+        .text-red { color: var(--danger); }
+        .text-muted { color: #bbb; }
+
+        /* Workout Box */
+        .workout-box { background: #f9f9fb; padding: 15px; border-radius: 12px; border: 1px solid #eee; }
+        .workout-list { list-style: none; padding: 0; margin: 10px 0; }
+        .workout-list li { padding: 5px 0; border-bottom: 1px dashed #eee; font-size: 0.9rem; }
+        
+        .completed-state { text-align: center; padding: 10px; color: var(--success); }
+
+        /* Graph */
+        .chart-container { width: 100%; height: 180px; margin-top: 10px; position: relative; }
+        svg { width: 100%; height: 100%; overflow: visible; }
+        .grid-line { stroke: var(--grid); stroke-width: 1; stroke-dasharray: 4; }
+        .chart-line { fill: none; stroke: var(--purple); stroke-width: 2.5; }
+        .chart-dot { fill: white; stroke: var(--purple); stroke-width: 2; }
+        .axis-text { font-size: 10px; fill: #8e8e93; }
+    </style>
+<script defer="" data-domain="mycalories.tiiny.site" src="https://analytics.tiiny.site/js/plausible.js"></script></head>
+<body>
+
+    <div class="card">
+        <h2>Target: <span id="goalText">2000</span> kcal</h2>
+        <div class="flex-row">
+            <input type="number" id="goalInput" placeholder="New Goal">
+            <button class="btn-blue" onclick="updateGoal()">Update</button>
+        </div>
+    </div>
+
+    <div class="card" id="workoutCard">
+        <h2 id="workoutDateTitle">Plan</h2>
+        <div id="workoutContent"></div>
+    </div>
+
+    <div class="card">
+        <h2 id="viewDateLabel">Log</h2>
+        
+        <div class="flex-row" style="background: #f8f8f8; padding: 10px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee;">
+            <div style="font-weight:bold; color:#555; align-self:center; margin-right:5px;">⚖️ Weight:</div>
+            <input type="number" id="dailyWeight" step="0.1" placeholder="kg">
+            <button class="btn-gray" onclick="saveWeight()">Save</button>
+        </div>
+
+        <h3>Calculator</h3>
+        <div class="flex-row">
+            <input type="number" id="p100" placeholder="kcal/100g">
+            <input type="number" id="weightInput" placeholder="Grams">
+        </div>
+        <button class="btn-gray" style="width:100%; margin-bottom:10px;" onclick="addCalculated()">Calculate &amp; Add</button>
+
+        <div class="flex-row">
+            <input type="number" id="manualCals" placeholder="Quick kcal">
+            <button class="btn-blue" onclick="addManual()">Add</button>
+        </div>
+        
+        <div style="border-top: 1px dashed #ddd; margin: 15px 0;"></div>
+        
+        <h3>Quick Meals</h3>
+        <div class="flex-row">
+            <select id="mealSelector">
+                <option value="">Select a meal...</option>
+            </select>
+            <button class="btn-blue" onclick="addSelectedMeal()">Add</button>
+        </div>
+        <div class="flex-row">
+            <input type="text" id="newMealName" placeholder="Meal Name (e.g. Oats)">
+            <input type="number" id="newMealCals" placeholder="kcal">
+        </div>
+        <button class="btn-gray" style="width:100%" onclick="saveNewMeal()">Save New Preset</button>
+        
+        <div id="historyItems" style="margin-top:15px;"></div>
+    </div>
+
+    <div class="card">
+        <h2 id="summaryTitle">Monthly Summary</h2>
+        <div class="summary-container" id="calorieSummary"></div>
+    </div>
+
+    <div class="card">
+        <div class="flex-row" style="justify-content:space-between; align-items:center;">
+            <button class="btn-gray" onclick="moveMonth(-1)">◀</button>
+            <b id="monthDisplay"></b>
+            <button class="btn-gray" onclick="moveMonth(1)">▶</button>
+        </div>
+        <div class="grid-7" id="calendarGrid" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+        <h2>Weight Trend</h2>
+        <div class="chart-container" id="weightChart"></div>
+    </div>
+
+<script>
+    let logs = JSON.parse(localStorage.getItem('cal_logs')) || {};
+    let meals = JSON.parse(localStorage.getItem('cal_meals')) || [];
+    let workoutLogs = JSON.parse(localStorage.getItem('cal_workouts')) || {}; 
+    let weightLogs = JSON.parse(localStorage.getItem('cal_weight')) || {};
+    let goal = parseInt(localStorage.getItem('cal_goal')) || 2000;
+    let viewDate = new Date(); 
+    let selectedDate = new Date().toISOString().split('T')[0];
+
+    const exercisesData = {
+        "A": { title: "Day A: Upper Body + Core", rounds: "3 rounds", list: ["Push-ups: 10–15", "Pike push-ups: 8–12", "Chair dips: 10–12", "Plank: 30–45 sec", "Mountain climbers: 30 sec"] },
+        "B": { title: "Day B: Legs + Glutes", rounds: "3–4 rounds", list: ["Squats: 15–20", "Reverse lunges: 10/leg", "Wall sit: 40–60 sec", "Glute bridges: 15–20", "Calf raises: 20–25"] },
+        "C": { title: "Day C: Full Body Burn", rounds: "4 rounds", list: ["Jumping jacks: 40 sec", "Push-ups: 10–12", "Bodyweight squats: 15", "High knees: 30 sec", "Plank taps: 20"] },
+        "D": { title: "Day D: Core + Posture", rounds: "3 rounds", list: ["Leg raises: 12–15", "Russian twists: 20", "Superman hold: 30 sec", "Dead bug: 12/side"] }
+    };
+    const weeklySchedule = { 1: "A", 2: "B", 4: "C", 6: "D" };
+
+    function renderMealOptions() {
+        const select = document.getElementById('mealSelector');
+        select.innerHTML = '<option value="">Select a meal...</option>';
+        meals.forEach((m, index) => {
+            const opt = document.createElement('option');
+            opt.value = index;
+            opt.textContent = `${m.name} (${m.cals} kcal)`;
+            select.appendChild(opt);
+        });
+    }
+
+    function saveNewMeal() {
+        const name = document.getElementById('newMealName').value.trim();
+        const cals = parseInt(document.getElementById('newMealCals').value);
+        if (name && cals > 0) {
+            meals.push({ name, cals });
+            localStorage.setItem('cal_meals', JSON.stringify(meals));
+            renderMealOptions();
+            document.getElementById('newMealName').value = '';
+            document.getElementById('newMealCals').value = '';
+            alert("Meal saved!");
+        }
+    }
+
+    function addSelectedMeal() {
+        const index = document.getElementById('mealSelector').value;
+        if (index !== "") {
+            saveEntry(meals[index].cals);
+            document.getElementById('mealSelector').value = "";
+        }
+    }
+
+    function addCalculated() {
+        const c100 = parseFloat(document.getElementById('p100').value);
+        const g = parseFloat(document.getElementById('weightInput').value);
+        if (c100 > 0 && g > 0) {
+            saveEntry(Math.round((c100 / 100) * g));
+            document.getElementById('p100').value = ''; document.getElementById('weightInput').value = '';
+        }
+    }
+
+    function saveWeight() {
+        const val = parseFloat(document.getElementById('dailyWeight').value);
+        if (val > 0) { weightLogs[selectedDate] = val; localStorage.setItem('cal_weight', JSON.stringify(weightLogs)); refresh(); }
+    }
+
+    function renderWorkoutCard() {
+        const code = weeklySchedule[new Date(selectedDate).getDay()] || null;
+        const container = document.getElementById('workoutContent');
+        document.getElementById('workoutDateTitle').innerText = `${new Date(selectedDate).toLocaleDateString('en-US', {weekday:'long'})}'s Plan`;
+
+        if (workoutLogs[selectedDate]) {
+            container.innerHTML = `<div class="completed-state"><h3>✅ Workout Done</h3><button class="btn-gray" onclick="undoWorkout()">Undo</button></div>`;
+            return;
+        }
+        if (!code) { container.innerHTML = `<div style="text-align:center;color:#888;padding:10px;">💤 Rest Day</div>`; return; }
+
+        const p = exercisesData[code];
+        container.innerHTML = `<div class="workout-box"><b>${p.title}</b><ul class="workout-list">${p.list.map(ex => `<li>${ex}</li>`).join('')}</ul><button class="btn-success" style="width:100%" onclick="markWorkout('${code}')">Mark Done</button></div>`;
+    }
+
+    function markWorkout(type) { workoutLogs[selectedDate] = [{type}]; localStorage.setItem('cal_workouts', JSON.stringify(workoutLogs)); refresh(); }
+    function undoWorkout() { delete workoutLogs[selectedDate]; localStorage.setItem('cal_workouts', JSON.stringify(workoutLogs)); refresh(); }
+    function updateGoal() { goal = parseInt(document.getElementById('goalInput').value) || goal; localStorage.setItem('cal_goal', goal); refresh(); }
+    function addManual() { saveEntry(parseInt(document.getElementById('manualCals').value)); document.getElementById('manualCals').value = ''; }
+    
+    function saveEntry(n) { 
+        if(n>0){ 
+            if(!logs[selectedDate]) logs[selectedDate]=[]; 
+            logs[selectedDate].push({id:Date.now(), cals:n, time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}); 
+            localStorage.setItem('cal_logs', JSON.stringify(logs)); 
+            refresh(); 
+        }
+    }
+
+    // FUNCTION: Renders summary for every day in the month view
+    function renderCalorieSummary() {
+        const container = document.getElementById('calorieSummary');
+        const summaryTitle = document.getElementById('summaryTitle');
+        let html = '';
+        
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        summaryTitle.innerText = `Summary: ${viewDate.toLocaleString('default', {month:'long'})}`;
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            const total = (logs[dStr] || []).reduce((a, b) => a + b.cals, 0);
+            
+            const diff = total - goal;
+            const percent = goal > 0 ? Math.round((diff / goal) * 100) : 0;
+            const isSelected = (dStr === selectedDate);
+            
+            let colorClass = 'text-muted';
+            let devText = '-';
+            
+            if (total > 0) {
+                colorClass = (total <= goal) ? 'text-green' : 'text-red';
+                devText = (diff > 0 ? '+' : '') + percent + '%';
+            }
+
+            const dateLabel = new Date(year, month, i).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+
+            html += `
+                <div class="summary-item ${isSelected ? 'active-day' : ''}">
+                    <span>${dateLabel}</span>
+                    <span><b>${total}</b> / ${goal}</span>
+                    <span class="deviation ${colorClass}">${devText}</span>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    function deleteItem(id) { logs[selectedDate] = logs[selectedDate].filter(i => i.id !== id); localStorage.setItem('cal_logs', JSON.stringify(logs)); refresh(); }
+    function selectDay(d) { selectedDate = d; refresh(); }
+    function moveMonth(n) { viewDate.setMonth(viewDate.getMonth()+n); refresh(); }
+
+    function renderChart() {
+        const container = document.getElementById('weightChart');
+        const dates = Object.keys(weightLogs).sort().slice(-14);
+        if (dates.length < 2) { container.innerHTML = '<p style="text-align:center;padding-top:70px;color:#ccc">Need 2 logs for graph</p>'; return; }
+
+        const w = container.offsetWidth, h = container.offsetHeight;
+        const padL = 35, padR = 10, padT = 15, padB = 25;
+        const chartW = w - padL - padR, chartH = h - padT - padB;
+        const values = dates.map(d => weightLogs[d]);
+        let minV = Math.floor(Math.min(...values) - 1), maxV = Math.ceil(Math.max(...values) + 1);
+        const range = maxV - minV;
+
+        let svg = '';
+        for (let i = 0; i <= 4; i++) {
+            const val = minV + (range * (i/4));
+            const y = padT + chartH - ((val - minV) / range * chartH);
+            svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" class="grid-line" />`;
+            svg += `<text x="${padL-5}" y="${y}" class="axis-text" text-anchor="end" alignment-baseline="middle">${val.toFixed(0)}</text>`;
+        }
+
+        let poly = '';
+        dates.forEach((d, i) => {
+            const x = padL + (i * (chartW / (dates.length - 1)));
+            const y = padT + chartH - ((weightLogs[d] - minV) / range * chartH);
+            poly += `${x},${y} `;
+            svg += `<circle cx="${x}" cy="${y}" r="4" class="chart-dot" />`;
+            if (i % 3 === 0 || i === dates.length-1) {
+                const label = d.split('-')[2] + "/" + d.split('-')[1];
+                svg += `<text x="${x}" y="${h-5}" class="axis-text" text-anchor="middle">${label}</text>`;
+            }
+        });
+        container.innerHTML = `<svg viewBox="0 0 ${w} ${h}"><polyline points="${poly}" class="chart-line" />${svg}</svg>`;
+    }
+
+    function refresh() {
+        document.getElementById('goalText').innerText = goal;
+        document.getElementById('viewDateLabel').innerText = `Log: ${selectedDate}`;
+        document.getElementById('dailyWeight').value = weightLogs[selectedDate] || '';
+        
+        renderWorkoutCard();
+        renderCalorieSummary(); // This renders the new box
+        
+        const items = logs[selectedDate] || [];
+        document.getElementById('historyItems').innerHTML = items.map(i => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee"><span>${i.time} - <b>${i.cals} kcal</b></span><span style="color:red;cursor:pointer" onclick="deleteItem(${i.id})">✕</span></div>`).join('');
+
+        const grid = document.getElementById('calendarGrid'); grid.innerHTML = '';
+        const y = viewDate.getFullYear(), m = viewDate.getMonth();
+        document.getElementById('monthDisplay').innerText = viewDate.toLocaleString('default', {month:'long', year:'numeric'});
+        for (let i = 1; i <= new Date(y, m+1, 0).getDate(); i++) {
+            const d = `${y}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+            const total = (logs[d]||[]).reduce((a,b)=>a+b.cals,0);
+            const color = total > 0 ? (total <= goal ? 'green' : 'red') : '';
+            grid.innerHTML += `<div class="day ${color} ${d === selectedDate ? 'selected' : ''}" onclick="selectDay('${d}')">${i}${workoutLogs[d]?'<div class="workout-dot"></div>':''}</div>`;
+        }
+        renderChart();
+    }
+
+    renderMealOptions();
+    refresh();
+</script>
+
+</body></html>
